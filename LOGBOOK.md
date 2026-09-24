@@ -170,3 +170,14 @@ Figure: `out/multivoice_proof.png`. Demos: `out/chord_theta_gamma.wav`,
       hemisphere-targeting experiments (bias_deg).
 - [ ] Possible EEG closed-loop (Muse/OpenBCI) to actually measure entrainment.
 - [ ] Polish: CLI, config files for sessions, FLAC export, long-render streaming.
+
+## 2026-09-23 — Session 5: git + GitHub
+
+- `git init` (branch `main`), pushed to **private** repo
+  https://github.com/shkennedy33/resonance
+- Added `.gitignore` (.venv, __pycache__, `out/*.wav|flac` — audio is
+  regenerable via verify*.py; proof PNGs ARE committed) and `requirements.txt`.
+- Re-ran `test_engine.py`: ALL PASS, nothing rotted since July.
+- Open threads (unchanged since S4): no subjective listening confirmation yet;
+  session sequencer / presets / CLI not built; README Status section stale
+  (predates live engine, spatializer, multi-voice); EEG closed loop (Phase 2).
