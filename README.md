@@ -60,13 +60,22 @@ phase-locked to the motion. `hits` decouples rhythm from motion: a 10 Hz orbit
 (slow enough to hear as travel) struck 4× per lap is a 40 Hz strike train
 walking the compass around your head.
 
+- `nest` groups strikes into one burst per path cycle, centred on the hit point:
+  **theta-gamma nesting** (the hippocampus nests gamma inside theta). Preset
+  `theta-gamma-nest`: 6.67 Hz orbit × 6 hits = 40 Hz strikes in theta bursts.
+- `click timbre` crossfades each strike from the struck tone to a broadband
+  noise burst — a true click. Broadband clicks localize far better than pure
+  tones: a click struck hard-right measurably reaches the right ear first by the
+  head-model delay (1.35 ms measured vs 1.39 ms predicted). Presets
+  `click-walk`, `gamma-click`.
+
 | preset | 40 Hz envelope depth, one ear |
 |---|---|
 | `classic-gamma` (patent SAM) | 0.000 |
 | `gamma-focus` (spatial, smooth) | 0.130 |
 | `gamma-strike` (motion + strikes) | 0.333 |
 | `gamma-walk` (10 Hz orbit × 4 hits) | 0.405 |
-| `gamma-click` (strikes only, GENUS-style control) | 0.600 |
+| `gamma-click` (strikes only, GENUS-style control) | broadband clicks |
 
 Science caveat: the mouse results (Martorell 2019, Murdock 2024) are contested
 (Soula 2023 failed to replicate), and human trials are early.
@@ -130,7 +139,7 @@ Every claim about the signal is measured:
 ```bash
 python test_engine.py       # realtime: clickless, IPD ±150° @ 40 Hz, knob glides
 python test_session.py      # sessions: timing, no clicks at scene changes, clean fades
-python test_pulse.py        # strikes: envelope drive, hit decoupling, clickless sweeps
+python test_pulse.py        # strikes: envelope drive, hit decoupling, nesting, click localization
 python verify.py            # patent SAM: predicted vs measured IPD -> out/sam_gamma40.png
 python verify_spatial.py    # head model: ITD 656 µs @ 90°, orbit continuity
 python verify_multivoice.py # voices coexist and separate in space

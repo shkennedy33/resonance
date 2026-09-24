@@ -7,13 +7,19 @@ Checks:
   - hits decouple rhythm from motion: 10 Hz orbit x 4 hits -> envelope peak at 40 Hz
   - envelope is continuous across strike wrap even when decay > period
   - sweeping pulse/decay live doesn't click; output stays in range
+  - nesting: theta-gamma-nest envelope carries BOTH 40 Hz strikes and 6.67 Hz bursts
+  - click timbre is broadband AND localized: a click struck hard-right reaches
+    the right ear first by the head-model ITD
 """
+import json
+
 import numpy as np
 from scipy.signal import hilbert
 
 from resonance.engine import Engine, BLOCK, SR
 from resonance.presets import load_preset
 from resonance.pulse import strike_gain
+from resonance.spatial import itd_gain_for_depth, ITD_90
 
 
 def render(state, secs=3.0, mutate=None):
@@ -78,6 +84,35 @@ def main():
     worst = np.abs(np.diff(x, axis=0)).max() / np.abs(np.diff(ref, axis=0)).max()
     check("live pulse/decay sweep clickless", worst < 1.3 and np.abs(x).max() <= 1.0,
           f"(worst step {worst:.2f}x steady struck, peak {np.abs(x).max():.2f})")
+
+    # --- nesting: phase-amplitude coupling shows up as a theta line in the envelope
+    nest = load_preset("theta-gamma-nest")
+    flat = json.loads(json.dumps(nest)); flat["voices"][0]["nest"] = 0.0
+    for st in (nest, flat):     # level cue off: the orbit's ILD alone rises & falls at 6.67 Hz
+        st["globals"]["noise"] = 0.0; st["voices"][0]["ild"] = 0.0
+    fr, sp = env_spectrum(render(nest, 4.0)[:, 0]); th_n, g_n = at(fr, sp, 6.667), at(fr, sp, 40)
+    fr, sp = env_spectrum(render(flat, 4.0)[:, 0]); th_f = at(fr, sp, 6.667)
+    check("nest: theta bursts + gamma strikes", th_n > 3 * th_f and g_n > 0.1,
+          f"(6.67 Hz env {th_f:.3f} -> {th_n:.3f}; 40 Hz {g_n:.3f})")
+
+    # --- click: broadband
+    def hf_share(x):
+        P = np.abs(np.fft.rfft(x)) ** 2; f = np.fft.rfftfreq(len(x), 1 / SR)
+        return P[f > 4000].sum() / P.sum()
+    tone = load_preset("gamma-walk"); clk = load_preset("click-walk")
+    h_t, h_c = hf_share(render(tone)[:, 0]), hf_share(render(clk)[:, 0])
+    check("click: broadband energy", h_c > 0.2 and h_t < 0.02, f"(>4 kHz share tone {h_t:.3f}, click {h_c:.2f})")
+
+    # --- click: localized. single hit per cycle at the hard-right point of a pendulum
+    st = json.loads(json.dumps(clk)); v = st["voices"][0]
+    v.update(path="pendulum", f_mod=5.0, hits=1, hit_at=90.0, arc=90.0, ild=0.0)
+    x = render(st, 3.0)
+    lagmax = int(0.004 * SR)
+    xc = [np.dot(x[lagmax:-lagmax, 0], np.roll(x[:, 1], k)[lagmax:-lagmax]) for k in range(-lagmax, lagmax + 1)]
+    lag_ms = (np.argmax(xc) - lagmax) / SR * 1000     # >0: right ear leads
+    want = itd_gain_for_depth(v["depth"], v["carrier"]) * ITD_90 * 1000
+    check("click: lands in space (right ear first)", abs(lag_ms - want) < 0.15,
+          f"(right leads by {lag_ms:.2f} ms, head model {want:.2f} ms)")
 
     print("\nRESULT:", "ALL PASS ✅" if ok else "FAIL ❌")
     return ok

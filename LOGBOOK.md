@@ -295,3 +295,24 @@ Everything else still green.
 cycle — real hippocampal phenomenon); broadband/noise-burst strike timbre
 (closer to GENUS clicks); per-hit spatial ping-pong patterns; visual 40 Hz
 flicker channel (GENUS's strongest results were audio+visual combined).
+
+## 2026-09-23 — Session 5e: nesting + click timbre; morph race fix
+
+**Nesting** (`nest` 0-1): burst window (1-nest) + nest*((1+cos phi)/2)^2 over
+the path cycle, centred on hit_at, multiplies the struck component. PAC proof:
+env 6.67 Hz line 0.003 -> 0.354 with nest (ild=0 to isolate — the orbit's ILD
+alone puts a theta line in each ear's envelope, a confound worth remembering).
+**Click** (`click` 0-1): strike timbre crossfade tone -> white-noise burst
+(CLICK_STD 0.45). Spatial: noise goes through the spatializer => localizes;
+measured right-ear lead 1.35 ms vs model 1.39 ms. Classic: click centred
+(shared noise both ears). pulse.py API now `strikes()` -> (tone_gain,
+click_env) and `make_shaper(p, rng, amp)`; spatial hook renamed
+`envelope=` -> `shaper=fn(mph, mono)->mono`. Voice has own rng.
+Presets: theta-gamma-nest, click-walk; gamma-click now broadband clicks.
+
+**BUG FIXED — morph race (would crash TUI):** _Morph flagged old voices
+`leaving` before publishing the new list; UI thread could read a rack with 0
+live voices -> IndexError in `selected`. Now publishes list first, then flags;
+`selected` also tolerates a mid-swap read. Stress: 115k snapshots across 300
+morphs, 0 errors. (Gotcha: stress loop without sleep starves the GIL; and
+`pkill -f <text>` kills your own shell if the text is in the command.)

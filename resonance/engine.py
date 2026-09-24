@@ -31,7 +31,7 @@ from scipy.signal import lfilter, lfilter_zi
 
 from .spatial import Spatializer, itd_gain_for_depth, shadow_for_ild
 from .paths import PATH_NAMES, get_path
-from .pulse import strike_gain
+from .pulse import strikes, make_shaper, CLICK_STD
 
 SR = 48_000
 BLOCK = 1024
@@ -61,6 +61,8 @@ VOICE_PARAMS = [
     {"key": "decay",       "label": "strike decay",  "min": 1.0,   "max": 40.0,   "step": 1.0,  "unit": "ms",  "default": 6.0},
     {"key": "hits",        "label": "hits / cycle",  "min": 1.0,   "max": 8.0,    "step": 1.0,  "unit": "",    "default": 1.0},
     {"key": "hit_at",      "label": "hit point",     "min": 0.0,   "max": 345.0,  "step": 15.0, "unit": "deg", "default": 0.0},
+    {"key": "nest",        "label": "nest (burst)",  "min": 0.0,   "max": 1.0,    "step": 0.1,  "unit": "",    "default": 0.0},
+    {"key": "click",       "label": "click timbre",  "min": 0.0,   "max": 1.0,    "step": 0.1,  "unit": "",    "default": 0.0},
     {"key": "gain",        "label": "voice gain",    "min": 0.0,   "max": 1.0,    "step": 0.05, "unit": "",    "default": 0.8},
 ]
 _VSPEC = {p["key"]: p for p in VOICE_PARAMS}
@@ -102,6 +104,7 @@ class Voice:
         self.engine_mode = overrides.get("engine_mode", "spatial")
         self.path_name = overrides.get("path_name", PATH_NAMES[0])
         self.spat = Spatializer(sr)
+        self.rng = np.random.default_rng()
         self.cphase = 0.0
         self.mphase = 0.0
         self.muted = False
@@ -180,14 +183,16 @@ class Voice:
         swing = phi_p * np.sin(mph)
         L = self.tone_amp * (1.0 + pan) * np.sin(cph + swing + bias / 2)
         R = self.tone_amp * (1.0 - pan) * np.sin(cph - swing - bias / 2)
-        g = self._strike(p)(mph)
-        if g is not None:
-            L, R = L * g, R * g
+        st = strikes(mph, p["f_mod"], p["pulse"], p["decay"], p["hits"],
+                     p["hit_at"], p["nest"])
+        if st is not None:
+            tone_g, click_env = st
+            c = p["click"]
+            L, R = L * tone_g * (1 - c), R * tone_g * (1 - c)
+            if c > 1e-4:     # classic has no delay lines: the click sits centred
+                k = c * self.tone_amp * CLICK_STD * self.rng.standard_normal(n) * click_env
+                L, R = L + k, R + k
         return L, R
-
-    def _strike(self, p):
-        return lambda mph: strike_gain(mph, p["f_mod"], p["pulse"], p["decay"],
-                                       p["hits"], p["hit_at"])
 
     def _spatial(self, n, p):
         pf = get_path(self.path_name)
@@ -196,7 +201,7 @@ class Voice:
             extent=np.deg2rad(p["arc"]), orient=np.deg2rad(p["bias"]),
             shadow=shadow_for_ild(p["ild"], p["carrier"]),
             itd_gain=itd_gain_for_depth(p["depth"], p["carrier"]), amp=self.tone_amp,
-            envelope=self._strike(p))
+            shaper=make_shaper(p, self.rng, self.tone_amp))
 
 
 _LOG_KEYS = {"carrier", "f_mod"}          # glide these in log-frequency (octaves)
@@ -253,11 +258,14 @@ class _Morph:
                 self.fading.append((v, v.target["gain"]))
         self.gfrom = dict(eng.gtarget)
         self.gto = dict(state["globals"])
-        eng.voices = keep + [v for v, _ in self.fading]
+        # publish the new list BEFORE flagging leavers, so the UI thread never
+        # sees a rack with zero live voices
         eng.sel = min(eng.sel, len(keep) - 1)
+        eng.voices = keep + [v for v, _ in self.fading]
+        for v, _ in self.fading:
+            v.leaving = True
 
     def _fade(self, v):
-        v.leaving = True
         self.fading.append((v, v.target["gain"]))
 
     def step(self, eng):
@@ -315,8 +323,8 @@ class Engine:
     # ---- voice rack management ------------------------------------------- #
     @property
     def selected(self):
-        live = self.live_voices()
-        return live[min(self.sel, len(live) - 1)]
+        live = self.live_voices() or self.voices   # tolerate a mid-swap read
+        return live[max(0, min(self.sel, len(live) - 1))]
 
     def add_voice(self):
         if len(self.live_voices()) >= MAX_VOICES:

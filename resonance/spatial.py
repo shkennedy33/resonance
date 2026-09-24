@@ -110,7 +110,7 @@ def _spatialize(mono, az, el, f_carrier, sr, shadow, history=None, itd_gain=1.0)
 
 def render_path(path="pendulum", f_carrier=300.0, f_mod=40.0, dur=10.0, *,
                 extent=None, orient=0.0, shadow=1.0, distance=0.6, itd_gain=1.0,
-                amp=0.6, sr=SR, fade_ms=60.0, path_kw=None, envelope=None):
+                amp=0.6, sr=SR, fade_ms=60.0, path_kw=None, shaper=None):
     """Offline render of a SAM tone moving along a named spatial path.
 
     path     : name in resonance.paths.PATHS
@@ -119,7 +119,8 @@ def render_path(path="pendulum", f_carrier=300.0, f_mod=40.0, dur=10.0, *,
     itd_gain : time-delay scale (1 = physical, >1 = hyper-real motion)
     distance : source distance (m); scales loudness ~1/distance
     extent   : override the path's angular size (rad)
-    envelope : optional fn(mod_phase_array) -> gain array (e.g. pulse.strike_gain)
+    shaper   : optional fn(mod_phase, mono) -> mono, applied to the source before
+               spatializing (e.g. pulse.make_shaper strikes/clicks)
     """
     n = int(round(dur * sr))
     t = np.arange(n) / sr
@@ -132,10 +133,8 @@ def render_path(path="pendulum", f_carrier=300.0, f_mod=40.0, dur=10.0, *,
     az = az + orient
 
     mono = amp * np.sin(TWO_PI * f_carrier * t)
-    if envelope is not None:
-        g = envelope(theta)
-        if g is not None:
-            mono = mono * g
+    if shaper is not None:
+        mono = shaper(theta, mono)
     L, R, _ = _spatialize(mono, az, el, f_carrier, sr, shadow, itd_gain=itd_gain)
     g = 0.6 / max(distance, 0.05)
     L *= g
@@ -156,7 +155,7 @@ class Spatializer:
 
     def process(self, frames, *, f_carrier, f_mod, path_fn, extent,
                 orient=0.0, shadow=1.0, itd_gain=1.0, amp=0.6, path_kw=None,
-                envelope=None):
+                shaper=None):
         n = frames
         cinc = TWO_PI * f_carrier / self.sr
         minc = TWO_PI * f_mod / self.sr
@@ -172,10 +171,8 @@ class Spatializer:
         az = az + orient
 
         mono = amp * np.sin(cph)
-        if envelope is not None:
-            g = envelope(mph)
-            if g is not None:
-                mono = mono * g
+        if shaper is not None:
+            mono = shaper(mph, mono)
         L, R, self.history = _spatialize(mono, az, el, f_carrier, self.sr,
                                          shadow, self.history, itd_gain=itd_gain)
         return L, R

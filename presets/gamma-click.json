@@ -1,5 +1,5 @@
 {
-  "note": "STRIKE ONLY (control): GENUS-style 40 Hz strike train, no spatial motion. Bright carrier, 2 ms decay.",
+  "note": "STRIKE ONLY (control): GENUS-style 40 Hz broadband click train, no spatial motion.",
   "voices": [
     {
       "engine": "spatial",
@@ -14,9 +14,11 @@
       "depth": 0.0,
       "ild": 0.0,
       "pulse": 1.0,
-      "decay": 2.0,
+      "decay": 1.5,
       "hits": 1.0,
       "hit_at": 0.0,
+      "nest": 0.0,
+      "click": 1.0,
       "gain": 0.7
     }
   ],
