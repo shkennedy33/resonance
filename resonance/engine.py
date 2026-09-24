@@ -25,13 +25,17 @@ Each Voice runs one of two synthesis engines:
 """
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import numpy as np
 import sounddevice as sd
 from scipy.signal import lfilter, lfilter_zi
 
-from .spatial import Spatializer, itd_gain_for_depth, shadow_for_ild
+from .spatial import Spatializer, itd_gain_for_depth, shadow_for_ild, _D0 as SPATIAL_DELAY
 from .paths import PATH_NAMES, get_path
 from .pulse import strikes, make_shaper, CLICK_STD
+from .avsync import AVWriter, dac_monotonic
 
 SR = 48_000
 BLOCK = 1024
@@ -307,6 +311,8 @@ class Engine:
         self.running = False
         self._stream = None
 
+        self.av = None                     # AVWriter when the light is on
+        self._light = None                 # flicker subprocess
         self.slowmo = None                 # Hz: every voice travels its path at this
                                            # rate (hear the shape); None = real f_mod
         self.clock = 0.0                   # seconds of audio rendered so far
@@ -414,9 +420,42 @@ class Engine:
                 "detail": self.selected.detail(), "globals": dict(self.gtarget),
                 "peak": self.peak, "running": self.running,
                 "morphing": self._morph is not None, "session": sess,
-                "slowmo": self.slowmo}
+                "slowmo": self.slowmo, "light": self.light_on}
 
     # ---- morphs & sessions (thread-safe handoff to the audio thread) ------ #
+    # ---- light (40 Hz flicker window, separate process) ------------------ #
+    def _lead_voice(self):
+        live = [v for v in self.live_voices() if not v.muted]
+        for v in live:
+            if v.target["pulse"] > 0:
+                return v
+        return live[0] if live else None
+
+    @property
+    def light_on(self):
+        return self._light is not None and self._light.poll() is None
+
+    def toggle_light(self):
+        if self.light_on:
+            self._light.terminate()
+            self._light = None
+            return False
+        if self.av is None:
+            self.av = AVWriter()
+        self._light = subprocess.Popen(
+            [sys.executable, "-m", "resonance.flicker", self.av.name],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+
+    def close(self):
+        self.stop()
+        if self.light_on:
+            self._light.terminate()
+        self._light = None
+        if self.av is not None:
+            self.av.close()
+            self.av = None
+
     def toggle_slowmo(self, rate=0.5):
         self.slowmo = None if self.slowmo else rate
 
@@ -461,6 +500,13 @@ class Engine:
         for kk in self.gcur:
             self.gcur[kk] += (self.gtarget[kk] - self.gcur[kk]) * a
 
+        lead = self._lead_voice() if self.av is not None else None
+        if lead is not None:
+            lead_ph = lead.spat.mphase if lead.engine_mode == "spatial" else lead.mphase
+            dac = dac_monotonic(time_info)
+            if lead.engine_mode == "spatial":
+                dac += SPATIAL_DELAY      # spatializer's fixed base delay
+
         accL = np.zeros(n, dtype=np.float64)
         accR = np.zeros(n, dtype=np.float64)
         for v in self.voices:
@@ -483,6 +529,12 @@ class Engine:
         outdata[:, 0] = L
         outdata[:, 1] = R
         self.peak = float(max(np.abs(L).max(), np.abs(R).max()))
+        if lead is not None:
+            c = lead.cur        # values this block actually used
+            self.av.publish(dac_mono=dac, mphase=lead_ph,
+                            f_mod=self.slowmo or c["f_mod"], pulse=c["pulse"],
+                            decay=c["decay"], hits=c["hits"], hit_at=c["hit_at"],
+                            nest=c["nest"], running=1.0)
         self.clock += n / self.sr
         if self.session is not None:
             self.session_t += n / self.sr
@@ -505,3 +557,5 @@ class Engine:
             self._stream.close()
             self._stream = None
         self.running = False
+        if self.av is not None:
+            self.av.publish(running=0.0)

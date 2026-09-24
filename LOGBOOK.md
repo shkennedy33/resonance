@@ -316,3 +316,43 @@ live voices -> IndexError in `selected`. Now publishes list first, then flags;
 `selected` also tolerates a mid-swap read. Stress: 115k snapshots across 300
 morphs, 0 errors. (Gotcha: stress loop without sleep starves the GIL; and
 `pkill -f <text>` kills your own shell if the text is in the command.)
+
+## 2026-09-23 — Session 5f: `flicker` BRANCH — phase-locked 40 Hz light
+
+S asked for light flicker on a separate branch (not merged to main yet).
+He's not worried about seizure risk for himself; README keeps one warning.
+
+**Box facts:** desktop is currently **KDE/KWin (Wayland)**, not Hyprland
+(no hypr socket; kwin sockets in /run/user/1000). Monitor HDMI-A-1
+1920x1080 **@100 Hz** (kscreen-doctor needs WAYLAND_DISPLAY=wayland-0
+XDG_RUNTIME_DIR=/run/user/1000). `pip install` HANGS on downloads here — curl
+the wheel from PyPI JSON and pip install the file (1 s). pygame-ce 2.5.8 cp314.
+
+**Architecture:** `avsync.py` seqlock shared memory (float64 fields). Audio
+callback publishes per block: dac_mono (time.monotonic when block hits DAC =
+now + outputBufferDacTime - currentTime; + spatial `_D0` 6.2 ms base delay
+for spatial lead), lead voice mphase at block start, f_mod actually used
+(slowmo aware), strike params. Lead = first unmuted voice with pulse>0 else
+voice 1. `flicker.py` = separate process (`python -m resonance.flicker
+<shm>`), pygame SCALED+vsync window; exits when parent pid changes (NOT on
+heartbeat staleness — pause stops heartbeat). Reader uses track=False.
+
+**Brightness = band-limited Fourier series** of one path cycle: drop
+harmonics >= fps/2, multiply by frame-hold sinc, normalize 0..1, evaluate at
+frame midpoint, sRGB-ish gamma 2.2. Naive on/off at 100 fps: 20 Hz
+sub-flicker 0.382; box average only: 0.056 (square's 120 Hz harmonic
+aliases to 20); band-limited: 0.000. Consequence: 40 Hz @100 fps = sine;
+square/strike modes only differ on >=240 Hz displays.
+
+**Tests** `test_flicker.py` (simulated monotonic clock; ground-truth DAC
+times, NOT the published ones — that mistake cancelled itself out once):
+round-trip, clean 40 Hz both modes, phase lock -0.14 ms, nest theta line.
+Real window on KWin: opens, detects 100 Hz, but frames came at 30.5 ms —
+monitor was DPMS Off (S away) so KWin throttled. **Unverified: real vsync
+pacing with the screen on** — next time S is at the desk, run the probe
+(set_mode SCALED vsync=1, measure flip intervals; expect ~10 ms). Window
+shows "display too slow" warning if measured fps < 2x rate.
+
+Ideas: sessions could toggle light per scene; LED + microcontroller for
+square-wave-exact flicker; calibrate display latency with a photodiode or
+by eye in slow-mo (trim ←→ in window).

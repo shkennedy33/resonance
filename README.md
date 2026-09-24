@@ -80,6 +80,21 @@ walking the compass around your head.
 Science caveat: the mouse results (Martorell 2019, Murdock 2024) are contested
 (Soula 2023 failed to replicate), and human trials are early.
 
+**Light** (`resonance/flicker.py`, TUI key `L`) — a 40 Hz flicker window,
+phase-locked to the lead voice's strikes (GENUS's strongest results were
+audio + visual combined). Runs as a separate process fed by a shared-memory
+timing packet from the audio callback (`avsync.py`): the exact moment each
+block reaches the speakers, so light and sound share one clock (measured
+alignment: 0.14 ms). Theta nesting carries into the light.
+In its window: `f` fullscreen · `m` mode · `↑↓` brightness · `←→` sync trim.
+
+Display honesty: the flicker is **band-limited** to what the screen can show.
+On a 100 Hz display, 40 Hz is 2.5 frames per cycle — naive on/off sampling
+adds a strong 20 Hz sub-flicker (measured 0.38 of the 40 Hz level); band-limited
+rendering removes it entirely (0.000), at the cost that a 40 Hz flicker at
+100 Hz can only be sine-shaped. 120/160/240 Hz displays do better; an LED on a
+microcontroller would be ideal. ⚠️ Photosensitive-epilepsy risk is real.
+
 **Presets** (`presets/*.json`) — the whole rack saved as a small, hand-editable
 JSON file. `w` saves from the TUI, `o` glides to one over 3 s.
 
@@ -131,6 +146,7 @@ rz.write("out/gamma.flac", *rz.normalize(L, R))
 | `1`–`5` | jump to delta / theta / alpha / beta / gamma |
 | `-` `=`, `[` `]` | master volume, pink-noise bed |
 | `w`, `o`, `s` | save preset, open preset, start/stop session |
+| `L` | light: open/close the phase-locked flicker window |
 | `z` | slow-mo: every voice traces its path at 0.5 Hz so you can hear the shape |
 | `space`, `q` | play/pause, quit |
 
@@ -140,6 +156,7 @@ Every claim about the signal is measured:
 python test_engine.py       # realtime: clickless, IPD ±150° @ 40 Hz, knob glides
 python test_session.py      # sessions: timing, no clicks at scene changes, clean fades
 python test_pulse.py        # strikes: envelope drive, hit decoupling, nesting, click localization
+python test_flicker.py      # light: clean 40 Hz at 100 fps, phase lock to audio, nesting
 python verify.py            # patent SAM: predicted vs measured IPD -> out/sam_gamma40.png
 python verify_spatial.py    # head model: ITD 656 µs @ 90°, orbit continuity
 python verify_multivoice.py # voices coexist and separate in space
