@@ -8,8 +8,9 @@ A *voice spec* is a dict describing one independent SAM generator:
     f_mod    : Hz (entrainment target)
     arc      : degrees (spatial: figure size; classic: peak phase deviation)
     bias     : degrees (aim / hemisphere)
-    itd_gain : spatial realism dial (1 physical .. 3 hyper)
-    shadow   : spatial ILD exaggeration
+    depth    : spatial motion depth, deg of interaural phase swing at 90 deg
+               (150 ~ classic engine; pitch-independent). Legacy: itd_gain
+    ild      : spatial level cue, dB at 90 deg. Legacy: shadow
     gain     : per-voice mix level (0..1)
 
 Example:
@@ -23,13 +24,18 @@ from __future__ import annotations
 import numpy as np
 
 from .core import SR, mix, normalize, fade
-from .spatial import render_path
+from .spatial import render_path, itd_gain_for_depth, shadow_for_ild
 from .generators import sam as classic_sam, pink_noise
 
 
 def _render_voice(spec, dur, sr):
     engine = spec.get("engine", "spatial")
     if engine == "spatial":
+        fc = spec.get("carrier", 300.0)
+        itd_gain = spec["itd_gain"] if "itd_gain" in spec and "depth" not in spec \
+            else itd_gain_for_depth(spec.get("depth", 150.0), fc)
+        shadow = spec["shadow"] if "shadow" in spec and "ild" not in spec \
+            else shadow_for_ild(spec.get("ild", 6.0), fc)
         L, R = render_path(
             spec.get("path", "pendulum"),
             f_carrier=spec.get("carrier", 300.0),
@@ -37,8 +43,7 @@ def _render_voice(spec, dur, sr):
             dur=dur,
             extent=np.deg2rad(spec["arc"]) if "arc" in spec else None,
             orient=np.deg2rad(spec.get("bias", 0.0)),
-            shadow=spec.get("shadow", 1.2),
-            itd_gain=spec.get("itd_gain", 1.5),
+            shadow=shadow, itd_gain=itd_gain,
             amp=0.6, sr=sr, fade_ms=60.0)
     else:  # classic
         L, R = classic_sam(

@@ -28,8 +28,9 @@ from .paths import get_path, TWO_PI
 
 C = 343.0          # speed of sound, m/s
 HEAD_R = 0.0875    # effective head radius, m
-_D0 = 0.0016       # base delay (s) so per-ear delay stays positive (> max ITD/2)
-_DMAX = _D0 + 0.0025  # delay-line length (s); shared by offline + realtime paths
+_D0 = 0.0062       # base delay (s) so per-ear delay stays positive (> max ITD/2);
+                   # sized for motion depth 170 deg on a 40 Hz carrier (~11.8 ms ITD)
+_DMAX = 2 * _D0 + 0.0003  # delay-line length (s); shared by offline + realtime paths
 
 
 def _lateral(az, el):
@@ -50,6 +51,25 @@ def ild_db(az, el, f_carrier, shadow=1.0):
     lat = _lateral(az, el)
     f_factor = np.clip(f_carrier / 1500.0, 0.0, 1.0)   # ~0 low freq -> 1 by 1.5 kHz
     return shadow * 12.0 * f_factor * np.sin(lat)
+
+
+ITD_90 = (HEAD_R / C) * (np.pi / 2 + 1.0)    # physical ITD for a source at 90 deg (~656 us)
+
+
+def itd_gain_for_depth(depth_deg, f_carrier):
+    """ITD scale so a source at 90 deg swings the interaural phase by `depth_deg`
+    at this carrier. Makes motion strength independent of pitch: physically, a
+    300 Hz tone only gets ~71 deg of IPD from a real head (itd_gain 1.0); depth 150
+    matches the classic engine's ±150 deg. Capped by the delay-line length."""
+    g = (np.deg2rad(depth_deg) / TWO_PI) / (max(f_carrier, 1.0) * ITD_90)
+    return float(min(g, 1.95 * _D0 / ITD_90))
+
+
+def shadow_for_ild(ild_db_90, f_carrier):
+    """Shadow multiplier giving `ild_db_90` dB of level difference at 90 deg,
+    whatever the carrier (physical head shadow at 300 Hz is only ~2.4 dB)."""
+    f_factor = max(float(np.clip(f_carrier / 1500.0, 0.0, 1.0)), 1e-3)
+    return float(ild_db_90 / (12.0 * f_factor))
 
 
 def _frac_read(ext, pos):

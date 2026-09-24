@@ -90,7 +90,7 @@ def main():
     # 5. spatial engine: finite, clickless across blocks, real SAM sidebands
     eng.engine_mode = "spatial"
     eng.path_name = "pendulum"
-    for kk, vv in (("carrier", 300), ("f_mod", 40), ("arc", 75), ("itd_gain", 1.5)):
+    for kk, vv in (("carrier", 300), ("f_mod", 40), ("arc", 75), ("depth", 150)):
         eng.set(kk, vv); eng.cur[kk] = float(vv)
     Ls_full, _ = run_blocks(eng, 210)
     Ls = Ls_full[10 * BLOCK:]          # drop delay-line priming (startup transient)

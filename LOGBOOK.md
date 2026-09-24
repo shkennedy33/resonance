@@ -231,3 +231,31 @@ save, session start/stop all work, clean exit.
 **Still open:** S's listening verdict (esp. spatial vs classic intensity);
 EEG closed loop (Phase 2). Idea parked: session "loop"/repeat sections,
 per-voice overrides in scenes.
+
+## 2026-09-23 — Session 5c: realistic engine was too subtle -> depth/ild knobs, slow-mo
+
+**S's listening verdict (tour):** realistic/spatial engine too subtle; hard to
+tell at 40 Hz; motion dynamics hard to hear generally. His directive: **when in
+doubt, err toward intensity, not subtlety.** (Saved as a feedback memory.)
+
+**Knob change (per-voice):** `itd_gain` (x) -> `depth` (deg, 0-170, default 150);
+`shadow` (x) -> `ild` (dB @90°, 0-12, default 6). Both pitch-independent,
+converted in `spatial.itd_gain_for_depth` / `shadow_for_ild`. Low-level physics
+API (render_path itd_gain/shadow) unchanged; compose.py accepts depth/ild and
+still honors legacy itd_gain/shadow in specs. `_D0` raised 1.6 ms -> 6.2 ms
+(delay line holds ~11.8 ms ITD = depth 170 at 40 Hz carrier); itd_gain capped
+to delay-line length.
+Measured @40 Hz gamma-focus: OLD ±63° IPD / ±2.8 dB -> NEW ±133° / ±5.8 dB
+(arc 75); classic = ±150° / 0 dB. Presets migrated; gamma-focus arc->90,
+delta-floor arc->75.
+
+**Slow-mo (`z`, `Engine.slowmo`)**: overrides every voice's f_mod with 0.5 Hz
+(phase-continuous, no click: toggle jump 1.006x typical). Purpose: hear the
+path SHAPE. Physiology told to S: binaural sluggishness — IPD motion is only
+perceived as motion up to ~5-10 Hz; faster = width/flutter. 40 Hz motion is
+never consciously audible as travel; SAM's claim is subcortical following
+(IPM-FR literature — exact 40 Hz efficacy uncertain; EEG will tell).
+
+Measurement gotcha: hilbert-IPD is unreliable when f_mod is near the carrier
+(e.g. 60 Hz carrier / 40 Hz mod reads asymmetric) — method limit, not audio.
+All tests green.

@@ -29,7 +29,7 @@ import numpy as np
 import sounddevice as sd
 from scipy.signal import lfilter, lfilter_zi
 
-from .spatial import Spatializer
+from .spatial import Spatializer, itd_gain_for_depth, shadow_for_ild
 from .paths import PATH_NAMES, get_path
 
 SR = 48_000
@@ -54,8 +54,8 @@ VOICE_PARAMS = [
     {"key": "arc",         "label": "arc / size",    "min": 0.0,   "max": 90.0,   "step": 5.0,  "unit": "deg", "default": 75.0},
     {"key": "bias",        "label": "aim (bias)",    "min": -90.0, "max": 90.0,   "step": 5.0,  "unit": "deg", "default": 0.0},
     {"key": "level_depth", "label": "level depth",   "min": 0.0,   "max": 1.0,    "step": 0.05, "unit": "",    "default": 0.35},
-    {"key": "itd_gain",    "label": "itd gain",      "min": 0.5,   "max": 3.0,    "step": 0.25, "unit": "x",   "default": 1.5},
-    {"key": "shadow",      "label": "ild shadow",    "min": 0.0,   "max": 3.0,    "step": 0.25, "unit": "x",   "default": 1.2},
+    {"key": "depth",       "label": "motion depth",  "min": 0.0,   "max": 170.0,  "step": 10.0, "unit": "deg", "default": 150.0},
+    {"key": "ild",         "label": "level cue",     "min": 0.0,   "max": 12.0,   "step": 0.5,  "unit": "dB",  "default": 6.0},
     {"key": "gain",        "label": "voice gain",    "min": 0.0,   "max": 1.0,    "step": 0.05, "unit": "",    "default": 0.8},
 ]
 _VSPEC = {p["key"]: p for p in VOICE_PARAMS}
@@ -136,11 +136,13 @@ class Voice:
                 "muted": self.muted}
 
     # ---- synthesis -------------------------------------------------------- #
-    def synth(self, n, alpha):
+    def synth(self, n, alpha, f_mod_override=None):
         old = dict(self.cur)
         for k in self.cur:
             self.cur[k] += (self.target[k] - self.cur[k]) * alpha
         p = self.cur
+        if f_mod_override is not None:
+            p = dict(p, f_mod=f_mod_override)
 
         if self.engine_mode == "spatial":
             L, R = self._spatial(n, p)
@@ -179,7 +181,8 @@ class Voice:
         return self.spat.process(
             n, f_carrier=p["carrier"], f_mod=p["f_mod"], path_fn=pf,
             extent=np.deg2rad(p["arc"]), orient=np.deg2rad(p["bias"]),
-            shadow=p["shadow"], itd_gain=p["itd_gain"], amp=self.tone_amp)
+            shadow=shadow_for_ild(p["ild"], p["carrier"]),
+            itd_gain=itd_gain_for_depth(p["depth"], p["carrier"]), amp=self.tone_amp)
 
 
 _LOG_KEYS = {"carrier", "f_mod"}          # glide these in log-frequency (octaves)
@@ -282,6 +285,8 @@ class Engine:
         self.running = False
         self._stream = None
 
+        self.slowmo = None                 # Hz: every voice travels its path at this
+                                           # rate (hear the shape); None = real f_mod
         self.clock = 0.0                   # seconds of audio rendered so far
         self._morph = None
         self._pending_morph = None         # handed over from the UI thread
@@ -386,9 +391,13 @@ class Engine:
         return {"voices": [v.summary() for v in self.live_voices()], "sel": self.sel,
                 "detail": self.selected.detail(), "globals": dict(self.gtarget),
                 "peak": self.peak, "running": self.running,
-                "morphing": self._morph is not None, "session": sess}
+                "morphing": self._morph is not None, "session": sess,
+                "slowmo": self.slowmo}
 
     # ---- morphs & sessions (thread-safe handoff to the audio thread) ------ #
+    def toggle_slowmo(self, rate=0.5):
+        self.slowmo = None if self.slowmo else rate
+
     def morph_to(self, state, seconds=3.0):
         """Glide the rack to a normalized state (see presets.normalize_state)."""
         self._pending_morph = (state, seconds)
@@ -433,7 +442,7 @@ class Engine:
         accL = np.zeros(n, dtype=np.float64)
         accR = np.zeros(n, dtype=np.float64)
         for v in self.voices:
-            L, R = v.synth(n, a)
+            L, R = v.synth(n, a, self.slowmo)
             accL += L
             accR += R
 

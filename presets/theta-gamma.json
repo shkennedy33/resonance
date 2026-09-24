@@ -11,9 +11,9 @@
       "arc": 70.0,
       "bias": -40.0,
       "level_depth": 0.35,
-      "itd_gain": 1.5,
-      "shadow": 1.2,
-      "gain": 0.75
+      "gain": 0.75,
+      "depth": 150.0,
+      "ild": 6.0
     },
     {
       "engine": "spatial",
@@ -25,9 +25,9 @@
       "arc": 60.0,
       "bias": 40.0,
       "level_depth": 0.35,
-      "itd_gain": 1.5,
-      "shadow": 1.2,
-      "gain": 0.55
+      "gain": 0.55,
+      "depth": 150.0,
+      "ild": 6.0
     }
   ],
   "globals": {

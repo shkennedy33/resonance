@@ -11,9 +11,9 @@
       "arc": 90.0,
       "bias": 0.0,
       "level_depth": 0.35,
-      "itd_gain": 2.0,
-      "shadow": 1.2,
-      "gain": 0.8
+      "gain": 0.8,
+      "depth": 150.0,
+      "ild": 6.0
     }
   ],
   "globals": {

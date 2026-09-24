@@ -32,12 +32,22 @@ Each voice runs one of two engines:
 - **spatial** — geometric. A spherical-head model (true interaural time delay +
   head-shadow level difference) moves the tone along a **path**: `pendulum`,
   `arc_front`, `orbit`, `halo`, `figure8`, `lissajous`, `rose`, `spinner`.
-  Realistic, externalized; gentler swing (±66° at 300 Hz).
+  Externalized, with a loudness cue that follows position. Strength is set by
+  `motion depth` (degrees of interaural phase swing, pitch-independent; 150 ≈
+  the classic engine) and `level cue` (dB). A real head only gives ~±70° at
+  300 Hz — the defaults deliberately exceed physics, because physical was too
+  subtle to hear.
 - **classic** — the patent's phase-offset equations verbatim. Hyper-real,
   exaggerated swing (±150°). Modes `phase`, `natural`, `circular`, `figure8`.
 
 Unlike binaural beats, SAM is spatial-position modulation, not a beat, so it
 has **no ~30 Hz ceiling** — it reaches gamma (40–70 Hz).
+
+Heads-up on perception: the brain's direction-finding is slow (binaural
+sluggishness) — it tracks position changes up to roughly 5–10 Hz. Above that,
+motion is heard as width/flutter, not travel. So at 40 Hz you won't *hear* a
+swing; the entrainment claim is that the brainstem follows anyway. Press `z`
+(slow-mo) to hear any path's actual shape at 0.5 Hz.
 
 **Presets** (`presets/*.json`) — the whole rack saved as a small, hand-editable
 JSON file. `w` saves from the TUI, `o` glides to one over 3 s.
@@ -90,6 +100,7 @@ rz.write("out/gamma.flac", *rz.normalize(L, R))
 | `1`–`5` | jump to delta / theta / alpha / beta / gamma |
 | `-` `=`, `[` `]` | master volume, pink-noise bed |
 | `w`, `o`, `s` | save preset, open preset, start/stop session |
+| `z` | slow-mo: every voice traces its path at 0.5 Hz so you can hear the shape |
 | `space`, `q` | play/pause, quit |
 
 ## Proof, not promises

@@ -18,6 +18,7 @@ Keys
     w              write (save) the rack as a preset
     o              open a preset (glides there over 3 s)
     s              start a session / stop the running one
+  z                slow-mo: all voices trace their path at 0.5 Hz (hear the shape)
   space play/pause     q quit
 
 Launch straight into something:
@@ -63,6 +64,8 @@ def _draw(stdscr, eng, psel, msg=""):
             stdscr.addnstr(y, x, s, max(0, w - x - 1), attr)
 
     status = "▶ playing" if snap["running"] else "⏸ paused"
+    if snap["slowmo"]:
+        put(0, max(30, w - 34), f"SLOW-MO {snap['slowmo']:g} Hz", curses.A_BOLD | curses.color_pair(3))
     put(0, 2, "resonance — multi-voice SAM", curses.A_BOLD)
     put(0, max(30, w - 12), status, curses.A_BOLD |
         (curses.color_pair(2) if snap["running"] else curses.color_pair(3)))
@@ -146,7 +149,7 @@ def _draw(stdscr, eng, psel, msg=""):
         curses.A_DIM)
     put(fy + 1, 2, "↑↓ knob · ←→ adjust · -=vol · []noise · space play · q quit",
         curses.A_DIM)
-    put(fy + 2, 2, "w save preset · o open preset · s session start/stop",
+    put(fy + 2, 2, "w save preset · o open preset · s session · z slow-mo",
         curses.A_DIM)
     put(fy + 3, 2, "⚠ headphones. not while driving. epilepsy = don't.",
         curses.color_pair(3))
@@ -274,6 +277,10 @@ def _loop(stdscr, eng, preset=None, session=None):
                 eng.nudge_global("noise", +1)
             elif c == ord(" "):
                 eng.stop() if eng.running else eng.start()
+            elif c == ord("z"):
+                eng.toggle_slowmo()
+                say("slow-mo: hear the path shape (z to return)" if eng.slowmo
+                    else "real speed")
             elif c == ord("w"):
                 name = _prompt(stdscr, "save preset as: ")
                 if name:
