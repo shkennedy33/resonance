@@ -1,8 +1,7 @@
 # resonance
 
 An open, inspectable brainwave-entrainment instrument inspired by the Monroe
-Institute (Hemi-Sync, **SAM** / Spatial Angle Modulation) — built from first
-principles so every signal is mathematically verifiable.
+Institute (Hemi-Sync, **SAM** / Spatial Angle Modulation).
 
 ## Why
 Monroe's SAM is locked down (no public recordings or specs). But the method is
