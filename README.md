@@ -134,7 +134,7 @@ rz.write("out/gamma.flac", *rz.normalize(L, R))
 | `z` | slow-mo: every voice traces its path at 0.5 Hz so you can hear the shape |
 | `space`, `q` | play/pause, quit |
 
-## Proof, not promises
+## Tests / verification against the SAM patent etc
 Every claim about the signal is measured:
 ```bash
 python test_engine.py       # realtime: clickless, IPD ±150° @ 40 Hz, knob glides
@@ -146,16 +146,16 @@ python verify_multivoice.py # voices coexist and separate in space
 ```
 Proof figures live in `out/*.png`.
 
-**Honest science read:** frequency-following responses to rhythmic auditory
+frequency-following responses to rhythmic auditory
 input are real, and driving the brain's localization pathway at 40 Hz is a
 legitimate route to gamma. "Targeting a hemisphere" by aiming a voice left or
-right has a real anatomical kernel but is **unproven** — it's on the list to
+right has a real anatomical kernel but is unproven. it's on the list to
 test with EEG. The engineering stands on its own either way.
 
 ## ⚠️ Safety
 Entrainment audio can be intense. **Do not use while driving or operating
 machinery.** If you have epilepsy or a seizure history, avoid it. Start with
-short sessions at low volume.
+short sessions at low volume. Low volume is much more effective, in general. And like, for real, don't be listening to dang ol' Monroe Institute mind control tech while driving. That's dumb. Don't be dumb. 
 
 ## Status & next
 Working: live multi-voice engine, both SAM engines, presets, sessions, offline
