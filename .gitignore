@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+# rendered audio is regenerable via verify*.py — keep proof figures only
+out/*.wav
+out/*.flac
