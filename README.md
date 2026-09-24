@@ -151,13 +151,11 @@ legitimate route to gamma. "Targeting a hemisphere" by aiming a voice left or
 right has a real anatomical kernel but is unproven. it's on the list to
 test with EEG. The engineering stands on its own either way.
 
-## ⚠️ Safety
+## Safety
 Entrainment audio can be intense. **Do not use while driving or operating
 machinery.** If you have epilepsy or a seizure history, avoid it. Start with
 short sessions at low volume. Low volume is much more effective, in general. And like, for real, don't be listening to dang ol' Monroe Institute mind control tech while driving. That's dumb. Don't be dumb. 
 
 ## Status & next
 Working: live multi-voice engine, both SAM engines, presets, sessions, offline
-render, verification suite. Next: closed loop with a 1st-gen Emotiv EPOC
-(record EEG during a session, check for frequency-following, then let the brain
-steer the sound). See `LOGBOOK.md` for the full build history.
+render, verification suite. Next: BCI integration. See `LOGBOOK.md` for the full build history.
