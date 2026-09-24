@@ -1,51 +1,121 @@
 # resonance
 
-An open, inspectable suite of brainwave-entrainment audio tools inspired by the
-Monroe Institute (Hemi-Sync, **SAM** / Spatial Angle Modulation) — built from
-first principles so every signal is mathematically verifiable.
+An open, inspectable brainwave-entrainment instrument inspired by the Monroe
+Institute (Hemi-Sync, **SAM** / Spatial Angle Modulation) — built from first
+principles so every signal is mathematically verifiable.
 
 ## Why
-Monroe's SAM is locked down (no public recordings/specs). But the method is
+Monroe's SAM is locked down (no public recordings or specs). But the method is
 *patented* (US20130010967A1), so the equations are public. This project
-implements them cleanly and **proves** the output matches, then extends into a
-full layered-session toolkit.
-
-## Modalities
-- **SAM** — Spatial Angle Modulation. A single carrier tone whose apparent
-  spatial position swings at your target frequency via interaural phase
-  modulation. Unlike binaural beats it has **no ~30 Hz ceiling**, so it reaches
-  gamma (40–70 Hz). Modes: `phase` (patent-faithful), `natural` (adds loudness
-  cue), `circular` (orbits the head).
-- **Binaural beats**, **monaural beats**, **isochronic tones** (soft-gated),
-  **pink/brown noise** beds.
+implements them, **proves** the output matches, and then goes further: real
+3-D head geometry, multiple simultaneous voices, and scripted sessions.
 
 ## Quick start
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install numpy scipy soundfile sounddevice matplotlib
-python verify.py         # renders + proves a 40 Hz gamma SAM tone; writes out/
+pip install -r requirements.txt
+
+python live.py --session tour     # 4-minute guided listening tour (headphones!)
+python live.py                    # blank rack, play it by hand
+python -m resonance list          # what presets & sessions exist
 ```
 
+## What's in it
+
+**Live engine** (`resonance/engine.py`, `resonance/tui.py`) — a real-time,
+phase-continuous synth you play from the terminal. Every knob glides; nothing
+clicks. Up to 4 independent **voices**, each with its own carrier, entrainment
+rate, spatial path and aim — e.g. a 6 Hz theta tone orbiting left while a 40 Hz
+gamma tone swings on the right.
+
+Each voice runs one of two engines:
+- **spatial** — geometric. A spherical-head model (true interaural time delay +
+  head-shadow level difference) moves the tone along a **path**: `pendulum`,
+  `arc_front`, `orbit`, `halo`, `figure8`, `lissajous`, `rose`, `spinner`.
+  Realistic, externalized; gentler swing (±66° at 300 Hz).
+- **classic** — the patent's phase-offset equations verbatim. Hyper-real,
+  exaggerated swing (±150°). Modes `phase`, `natural`, `circular`, `figure8`.
+
+Unlike binaural beats, SAM is spatial-position modulation, not a beat, so it
+has **no ~30 Hz ceiling** — it reaches gamma (40–70 Hz).
+
+**Presets** (`presets/*.json`) — the whole rack saved as a small, hand-editable
+JSON file. `w` saves from the TUI, `o` glides to one over 3 s.
+
+**Sessions** (`sessions/*.json`) — a timeline of scenes the engine glides
+through: settle in alpha, slide to theta over three minutes, drop to delta,
+surface, fade out. Frequencies glide in octaves (log scale) so descents feel
+even. Between glides you can still turn knobs — perform over the script.
+
+```json
+{
+  "name": "descent",
+  "scenes": [
+    {"at": "0:00",                   "preset": "alpha-halo",  "label": "settle"},
+    {"at": "4:00",  "glide": "3:00", "preset": "theta-orbit", "label": "descend"},
+    {"at": "12:00", "glide": "2:00", "preset": "delta-floor", "label": "floor",
+     "globals": {"noise": 0.3}}
+  ],
+  "end": "24:00",
+  "fade_out": 60
+}
+```
+A scene takes a `preset`, inline `voices`, or both; `globals` overrides layer on
+top. Shipped: `tour` (4 min), `focus` (20 min), `descent` (25 min).
+
+**Offline rendering** — any session or preset to a 24-bit FLAC/WAV, rendered by
+the same engine you hear live (a 25-minute session takes ~40 s):
+```bash
+python -m resonance render descent               # -> out/descent.flac
+python -m resonance render --preset theta-gamma -d 300
+```
+
+**Classic generators** (`resonance/generators.py`) — `sam`, `binaural`,
+`monaural`, `isochronic` (soft-gated), `pink_noise`, `brown_noise`, `tone`, all
+returning plain numpy `(L, R)` arrays for your own layering:
 ```python
 import resonance as rz
-L, R = rz.sam(f_carrier=300, f_mod=40, dur=600, arc_deg=75, mode="phase")  # 10-min gamma
-L, R = rz.normalize(L, R)
-rz.write("out/gamma_session.flac", L, R)
+L, R = rz.sam(f_carrier=300, f_mod=40, dur=600, arc_deg=75, mode="phase")
+rz.write("out/gamma.flac", *rz.normalize(L, R))
 ```
 
-## Verifying a SAM signal
-```python
-from resonance.analyze import analyze_sam
-analyze_sam(L, R, f_carrier=300, f_mod=40, arc_deg=75, path="out/proof.png")
+## TUI keys
+| | |
+|---|---|
+| `tab`/`v`, `V` | next / previous voice |
+| `a`, `x`, `X` | add, mute, delete voice |
+| `↑↓` (`jk`), `←→` (`hl`) | pick knob, turn knob |
+| `e` | engine spatial ↔ classic |
+| `p`/`P`, `m`/`M` | cycle path (spatial) / mode (classic) |
+| `1`–`5` | jump to delta / theta / alpha / beta / gamma |
+| `-` `=`, `[` `]` | master volume, pink-noise bed |
+| `w`, `o`, `s` | save preset, open preset, start/stop session |
+| `space`, `q` | play/pause, quit |
+
+## Proof, not promises
+Every claim about the signal is measured:
+```bash
+python test_engine.py       # realtime: clickless, IPD ±150° @ 40 Hz, knob glides
+python test_session.py      # sessions: timing, no clicks at scene changes, clean fades
+python verify.py            # patent SAM: predicted vs measured IPD -> out/sam_gamma40.png
+python verify_spatial.py    # head model: ITD 656 µs @ 90°, orbit continuity
+python verify_multivoice.py # voices coexist and separate in space
 ```
-Produces a 4-panel figure: waveform phase-shift, interaural-phase swing (the
-spatial motion, measured), PM sideband spectrum, and the mono-sum tremolo.
+Proof figures live in `out/*.png`.
+
+**Honest science read:** frequency-following responses to rhythmic auditory
+input are real, and driving the brain's localization pathway at 40 Hz is a
+legitimate route to gamma. "Targeting a hemisphere" by aiming a voice left or
+right has a real anatomical kernel but is **unproven** — it's on the list to
+test with EEG. The engineering stands on its own either way.
 
 ## ⚠️ Safety
 Entrainment audio can be intense. **Do not use while driving or operating
-machinery.** If you have epilepsy or a seizure history, avoid — flashing/pulsing
-stimuli carry risk. Start with short sessions and low volume.
+machinery.** If you have epilepsy or a seizure history, avoid it. Start with
+short sessions at low volume.
 
-## Status
-Early. SAM engine + generators + verification working. Session sequencing,
-real-time engine, and CLI are next. See `LOGBOOK.md`.
+## Status & next
+Working: live multi-voice engine, both SAM engines, presets, sessions, offline
+render, verification suite. Next: closed loop with a 1st-gen Emotiv EPOC
+(record EEG during a session, check for frequency-following, then let the brain
+steer the sound). See `LOGBOOK.md` for the full build history.

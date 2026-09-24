@@ -1,0 +1,37 @@
+{
+  "note": "Two voices at once: theta orbiting left, gamma pendulum on the right.",
+  "voices": [
+    {
+      "engine": "spatial",
+      "path": "orbit",
+      "mode": "phase",
+      "muted": false,
+      "carrier": 220.0,
+      "f_mod": 6.0,
+      "arc": 70.0,
+      "bias": -40.0,
+      "level_depth": 0.35,
+      "itd_gain": 1.5,
+      "shadow": 1.2,
+      "gain": 0.75
+    },
+    {
+      "engine": "spatial",
+      "path": "pendulum",
+      "mode": "phase",
+      "muted": false,
+      "carrier": 400.0,
+      "f_mod": 40.0,
+      "arc": 60.0,
+      "bias": 40.0,
+      "level_depth": 0.35,
+      "itd_gain": 1.5,
+      "shadow": 1.2,
+      "gain": 0.55
+    }
+  ],
+  "globals": {
+    "volume": 0.45,
+    "noise": 0.1
+  }
+}

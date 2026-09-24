@@ -181,3 +181,53 @@ Figure: `out/multivoice_proof.png`. Demos: `out/chord_theta_gamma.wav`,
 - Open threads (unchanged since S4): no subjective listening confirmation yet;
   session sequencer / presets / CLI not built; README Status section stale
   (predates live engine, spatializer, multi-voice); EEG closed loop (Phase 2).
+
+## 2026-09-23 — Session 5b: presets, sessions, CLI, README (items 2-4)
+
+S chose items 1-4 from the open list. #1 (listening) is his; he pulled the repo
+to his laptop — built `sessions/tour.json` specifically as the listening test.
+
+**Core primitive: MORPH** (`engine._Morph`). Glide the whole rack to a target
+*state* over N s. Preset load = 3 s morph; session scene = morph. Voices match
+by index: same engine/path/mode -> knobs glide (carrier & f_mod in LOG freq);
+different -> old fades out (`Voice.leaving`) while new fades in, leaving voices
+removed once their slewed gain hits 0. Min morph 0.15 s (never hard-cut).
+All rack mutation during morphs happens in the audio thread; UI hands off via
+`_pending_morph` / `_pending_session`. `Engine.clock` = seconds rendered.
+`Engine.live_voices()` excludes leaving voices (selection/UI use this).
+
+**State format** (`presets.py`): {"voices":[spec..], "globals":{volume,noise}}.
+Voice spec vocabulary == compose.py's, so presets render offline too.
+`normalize_state` fills defaults + validates names. Files: `presets/*.json`.
+6 shipped: gamma-focus, classic-gamma, alpha-halo, theta-orbit, theta-gamma,
+delta-floor.
+
+**Sessions** (`session.py`, `sessions/*.json`): scenes {at, glide, preset |
+voices, globals, label}; times as s or "m:ss"; end + fade_out (fades master to
+0 then `session_done`). Sequencer writes nothing between glides -> live tweaks
+stick until next scene. `render_session` drives the REAL engine callback
+offline (same code path as live). 25 min renders in 37 s. Shipped: tour (4 min,
+labeled A-E walkthrough), focus (20), descent (25).
+
+**CLI**: `python -m resonance live [--preset|--session] | render SESSION
+[-o] | render --preset NAME -d SECS | list`. `live.py` passes argv through.
+**TUI**: w save preset (prompt), o open preset (picker), s session start/stop,
+session progress line on row 2, flash message line, stops stream on session end.
+
+**BUG FIXED (pre-existing, spatial.py):** `Spatializer` sized its delay-line
+history for D0+1.2 ms but `_spatialize` assumes D0+2.5 ms -> first block of
+every new spatial voice read misaligned by ~63 samples -> click at the first
+block boundary (was mostly masked by start()'s soft attack, but every morph
+crossfade creates new voices, so it mattered now). Unified as `_DMAX`.
+
+**Verification (ALL PASS):** new `test_session.py` (tour length, no clicks at
+scene changes — worst second 1.44x median, and that's pink noise not tone,
+checked: orbit w/o noise diff/peak 0.0291 vs pure sine 0.0288; ends silent;
+rack grows/shrinks; log glide midpoint; preset round-trip). All old tests +
+verify scripts still green. TUI driven in tmux with a fake silent stream
+(scratchpad fake_live.py pattern: monkeypatch sd.OutputStream) — picker,
+save, session start/stop all work, clean exit.
+
+**Still open:** S's listening verdict (esp. spatial vs classic intensity);
+EEG closed loop (Phase 2). Idea parked: session "loop"/repeat sections,
+per-voice overrides in scenes.

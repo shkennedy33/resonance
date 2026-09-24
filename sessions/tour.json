@@ -1,0 +1,13 @@
+{
+  "name": "tour",
+  "note": "~4 min listening test: walks through every flavor so you can judge each by ear. Watch the scene label in the TUI.",
+  "scenes": [
+    {"at": "0:00",               "preset": "gamma-focus",   "label": "A: core SAM, 40 Hz pendulum (spatial)"},
+    {"at": "0:40", "glide": 4,   "preset": "classic-gamma", "label": "B: same, classic engine (hyper-real)"},
+    {"at": "1:20", "glide": 12,  "preset": "theta-orbit",   "label": "C: 6 Hz orbit, full circle"},
+    {"at": "2:05", "glide": 8,   "preset": "alpha-halo",    "label": "D: 10 Hz halo overhead"},
+    {"at": "2:45", "glide": 8,   "preset": "theta-gamma",   "label": "E: two voices, theta L + gamma R"}
+  ],
+  "end": "3:45",
+  "fade_out": 12
+}

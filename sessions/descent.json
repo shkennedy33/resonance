@@ -1,0 +1,12 @@
+{
+  "name": "descent",
+  "note": "25 min: settle in alpha, slide down through theta to delta, rise back to light theta at the end.",
+  "scenes": [
+    {"at": "0:00",                 "preset": "alpha-halo",  "label": "settle"},
+    {"at": "4:00",  "glide": "3:00", "preset": "theta-orbit", "label": "descend"},
+    {"at": "12:00", "glide": "2:00", "preset": "delta-floor", "label": "floor"},
+    {"at": "19:00", "glide": "3:00", "preset": "theta-orbit", "label": "surface", "globals": {"noise": 0.1}}
+  ],
+  "end": "24:00",
+  "fade_out": 60
+}

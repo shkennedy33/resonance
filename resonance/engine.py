@@ -10,6 +10,9 @@ Structure
       ├─ voices: list[Voice]     each an independent SAM generator (its own
       │                          carrier, f_mod, path/mode, aim, gain, mute)
       ├─ globals: master volume + pink-noise bed (shared)
+      ├─ morph: glides the whole rack to a target *state* over N seconds
+      │         (preset loads and session scenes are both just morphs)
+      ├─ session: an optional timeline of morphs (see session.py)
       └─ callback: sum all voices -> + noise -> master vol -> clip
 
 This is the patent's "multiple paths at different frequencies to stimulate
@@ -97,6 +100,7 @@ class Voice:
         self.cphase = 0.0
         self.mphase = 0.0
         self.muted = False
+        self.leaving = False               # fading out during a morph; removed after
         self._mg = 1.0                     # smoothed mute gain (0..1), clickless
 
     # ---- control ---------------------------------------------------------- #
@@ -178,6 +182,86 @@ class Voice:
             shadow=p["shadow"], itd_gain=p["itd_gain"], amp=self.tone_amp)
 
 
+_LOG_KEYS = {"carrier", "f_mod"}          # glide these in log-frequency (octaves)
+_MIN_MORPH = 0.15                          # s; even "instant" changes crossfade
+
+
+def _ease(x):
+    x = min(max(x, 0.0), 1.0)
+    return 0.5 - 0.5 * np.cos(np.pi * x)
+
+
+def _interp(key, a, b, x):
+    if key in _LOG_KEYS and a > 0 and b > 0:
+        return float(a * (b / a) ** x)
+    return float(a + (b - a) * x)
+
+
+class _Morph:
+    """Glide the rack from where it is now to `state` over `seconds`.
+
+    Voices are matched by position. If a pair shares engine/path/mode its knobs
+    glide continuously; otherwise the old voice fades out while a new one fades
+    in (a path change can't be glided — it would jump position and click).
+    Runs inside the audio callback, so it owns all rack mutation while active.
+    """
+
+    def __init__(self, eng, state, seconds):
+        self.t0 = eng.clock
+        self.dur = max(float(seconds), _MIN_MORPH)
+        self.lanes = []                       # (voice, from, to)
+        self.fading = []                      # (voice, from_gain)
+        old = [v for v in eng.voices if not v.leaving]
+        keep = []
+        for i, spec in enumerate(state["voices"]):
+            v = old[i] if i < len(old) else None
+            to = {k: spec[k] for k in _VSPEC}
+            if v is not None and (v.engine_mode, v.path_name, v.mode) == \
+                    (spec["engine"], spec["path"], spec["mode"]):
+                self.lanes.append((v, dict(v.target), to))
+            else:
+                if v is not None:
+                    self._fade(v)
+                v = Voice(eng.sr, tone_amp=eng.tone_amp, engine_mode=spec["engine"],
+                          path_name=spec["path"], mode=spec["mode"], **to)
+                v.target["gain"] = 0.0
+                v.cur = dict(v.target)        # born silent, at its final shape
+                self.lanes.append((v, dict(v.target), to))
+            v.muted = spec["muted"]
+            keep.append(v)
+        for v in old[len(state["voices"]):]:
+            self._fade(v)
+        for v in eng.voices:                  # still fading from a previous morph
+            if v.leaving and all(v is not f for f, _ in self.fading):
+                self.fading.append((v, v.target["gain"]))
+        self.gfrom = dict(eng.gtarget)
+        self.gto = dict(state["globals"])
+        eng.voices = keep + [v for v, _ in self.fading]
+        eng.sel = min(eng.sel, len(keep) - 1)
+
+    def _fade(self, v):
+        v.leaving = True
+        self.fading.append((v, v.target["gain"]))
+
+    def step(self, eng):
+        """Advance one block. Returns True when finished."""
+        x = _ease((eng.clock - self.t0) / self.dur)
+        for v, a, b in self.lanes:
+            for k in b:
+                v.target[k] = _interp(k, a[k], b[k], x)
+        for v, g0 in self.fading:
+            v.target["gain"] = g0 * (1.0 - x)
+        for k in self.gto:
+            eng.gtarget[k] = _interp(k, self.gfrom[k], self.gto[k], x)
+        if x < 1.0:
+            return False
+        if any(v.cur["gain"] > 1e-4 for v, _ in self.fading):
+            return False                      # let the 60 ms slew land on zero
+        eng.voices = [v for v in eng.voices if not v.leaving]
+        eng.sel = min(eng.sel, len(eng.voices) - 1)
+        return True
+
+
 class Engine:
     def __init__(self, sr=SR, block=BLOCK, device=None, tone_amp=0.6):
         self.sr = sr
@@ -198,16 +282,25 @@ class Engine:
         self.running = False
         self._stream = None
 
+        self.clock = 0.0                   # seconds of audio rendered so far
+        self._morph = None
+        self._pending_morph = None         # handed over from the UI thread
+        self.session = None                # resonance.session.Session
+        self._pending_session = None
+        self.session_t = 0.0               # seconds into the running session
+        self.session_done = False
+
     def _smoothing_alpha(self, ms):
         return float(1.0 - np.exp(-(self.block / self.sr) / (ms / 1000.0)))
 
     # ---- voice rack management ------------------------------------------- #
     @property
     def selected(self):
-        return self.voices[self.sel]
+        live = self.live_voices()
+        return live[min(self.sel, len(live) - 1)]
 
     def add_voice(self):
-        if len(self.voices) >= MAX_VOICES:
+        if len(self.live_voices()) >= MAX_VOICES:
             return
         # seed a useful contrast: alternate aim, step through bands & paths
         i = len(self.voices)
@@ -217,17 +310,23 @@ class Engine:
                   bias=(30.0 if i % 2 else -30.0),
                   path_name=PATH_NAMES[i % len(PATH_NAMES)],
                   gain=0.7)
-        self.voices.append(v)
-        self.sel = len(self.voices) - 1
+        live = self.live_voices()
+        self.voices = live + [v] + [x for x in self.voices if x.leaving]
+        self.sel = len(live)
 
     def remove_voice(self):
-        if len(self.voices) <= 1:
+        live = self.live_voices()
+        if len(live) <= 1:
             return
-        self.voices.pop(self.sel)
-        self.sel = min(self.sel, len(self.voices) - 1)
+        live.pop(self.sel)
+        self.voices = live + [x for x in self.voices if x.leaving]
+        self.sel = min(self.sel, len(live) - 1)
 
     def select(self, direction):
-        self.sel = (self.sel + direction) % len(self.voices)
+        self.sel = (self.sel + direction) % len(self.live_voices())
+
+    def live_voices(self):
+        return [v for v in self.voices if not v.leaving]
 
     def toggle_mute(self):
         self.selected.muted = not self.selected.muted
@@ -277,14 +376,56 @@ class Engine:
     def path_name(self, v): self.selected.path_name = v
 
     def snapshot(self):
-        return {"voices": [v.summary() for v in self.voices], "sel": self.sel,
+        sess = None
+        if self.session is not None or self.session_done:
+            s = self.session
+            sess = {"name": s.name if s else "", "t": self.session_t,
+                    "length": s.length if s else 0.0,
+                    "scene": s.scene_label(self.session_t) if s else "",
+                    "done": self.session_done}
+        return {"voices": [v.summary() for v in self.live_voices()], "sel": self.sel,
                 "detail": self.selected.detail(), "globals": dict(self.gtarget),
-                "peak": self.peak, "running": self.running}
+                "peak": self.peak, "running": self.running,
+                "morphing": self._morph is not None, "session": sess}
+
+    # ---- morphs & sessions (thread-safe handoff to the audio thread) ------ #
+    def morph_to(self, state, seconds=3.0):
+        """Glide the rack to a normalized state (see presets.normalize_state)."""
+        self._pending_morph = (state, seconds)
+
+    def play_session(self, session):
+        self._pending_session = session
+
+    def stop_session(self):
+        self._pending_session = False
+
+    def _tick_control(self):
+        ps = self._pending_session
+        if ps is not None:
+            self._pending_session = None
+            self.session = ps or None
+            self.session_t = 0.0
+            self.session_done = False
+            if ps:
+                ps.reset()
+        if self.session is not None:
+            for state, glide in self.session.due(self.session_t, self):
+                self._pending_morph = (state, glide)
+            if self.session.finished(self.session_t):
+                self.session = None
+                self.session_done = True
+        pm = self._pending_morph
+        if pm is not None:
+            self._pending_morph = None
+            self._morph = _Morph(self, *pm)
+        if self._morph is not None and self._morph.step(self):
+            self._morph = None
 
     # ---- audio thread ---------------------------------------------------- #
     def _callback(self, outdata, frames, time_info, status):
         a = self.alpha
         n = frames
+        self._tick_control()
         gold = dict(self.gcur)
         for kk in self.gcur:
             self.gcur[kk] += (self.gtarget[kk] - self.gcur[kk]) * a
@@ -311,6 +452,9 @@ class Engine:
         outdata[:, 0] = L
         outdata[:, 1] = R
         self.peak = float(max(np.abs(L).max(), np.abs(R).max()))
+        self.clock += n / self.sr
+        if self.session is not None:
+            self.session_t += n / self.sr
 
     # ---- lifecycle ------------------------------------------------------- #
     def start(self):

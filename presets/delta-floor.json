@@ -1,0 +1,23 @@
+{
+  "note": "2.5 Hz: slow, low, frontal arc sunk into a thicker noise bed.",
+  "voices": [
+    {
+      "engine": "spatial",
+      "path": "arc_front",
+      "mode": "phase",
+      "muted": false,
+      "carrier": 160.0,
+      "f_mod": 2.5,
+      "arc": 50.0,
+      "bias": 0.0,
+      "level_depth": 0.35,
+      "itd_gain": 2.5,
+      "shadow": 1.2,
+      "gain": 0.8
+    }
+  ],
+  "globals": {
+    "volume": 0.42,
+    "noise": 0.3
+  }
+}

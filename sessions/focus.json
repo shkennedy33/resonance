@@ -1,0 +1,11 @@
+{
+  "name": "focus",
+  "note": "20 min: alpha on-ramp, long 40 Hz gamma block, theta+gamma cool-down.",
+  "scenes": [
+    {"at": "0:00",                 "preset": "alpha-halo",  "label": "on-ramp"},
+    {"at": "3:00",  "glide": "1:30", "preset": "gamma-focus", "label": "gamma block"},
+    {"at": "16:00", "glide": 45,   "preset": "theta-gamma", "label": "cool-down"}
+  ],
+  "end": "19:30",
+  "fade_out": 30
+}

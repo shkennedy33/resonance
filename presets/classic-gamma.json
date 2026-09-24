@@ -1,0 +1,23 @@
+{
+  "note": "Same 40 Hz target, patent phase-offset engine: exaggerated, hyper-real swing (\u00b1150\u00b0 vs \u00b166\u00b0).",
+  "voices": [
+    {
+      "engine": "classic",
+      "path": "pendulum",
+      "mode": "phase",
+      "muted": false,
+      "carrier": 300.0,
+      "f_mod": 40.0,
+      "arc": 75.0,
+      "bias": 0.0,
+      "level_depth": 0.35,
+      "itd_gain": 1.5,
+      "shadow": 1.2,
+      "gain": 0.8
+    }
+  ],
+  "globals": {
+    "volume": 0.4,
+    "noise": 0.0
+  }
+}

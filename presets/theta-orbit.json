@@ -1,0 +1,23 @@
+{
+  "note": "6 Hz: a low tone orbiting the full 360\u00b0 around the head.",
+  "voices": [
+    {
+      "engine": "spatial",
+      "path": "orbit",
+      "mode": "phase",
+      "muted": false,
+      "carrier": 220.0,
+      "f_mod": 6.0,
+      "arc": 90.0,
+      "bias": 0.0,
+      "level_depth": 0.35,
+      "itd_gain": 2.0,
+      "shadow": 1.2,
+      "gain": 0.8
+    }
+  ],
+  "globals": {
+    "volume": 0.45,
+    "noise": 0.18
+  }
+}

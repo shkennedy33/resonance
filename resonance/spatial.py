@@ -29,6 +29,7 @@ from .paths import get_path, TWO_PI
 C = 343.0          # speed of sound, m/s
 HEAD_R = 0.0875    # effective head radius, m
 _D0 = 0.0016       # base delay (s) so per-ear delay stays positive (> max ITD/2)
+_DMAX = _D0 + 0.0025  # delay-line length (s); shared by offline + realtime paths
 
 
 def _lateral(az, el):
@@ -69,7 +70,7 @@ def _spatialize(mono, az, el, f_carrier, sr, shadow, history=None, itd_gain=1.0)
     itd = woodworth_itd(az, el) * itd_gain
     ild = ild_db(az, el, f_carrier, shadow)
 
-    maxd = int(np.ceil((_D0 + 0.0025) * sr)) + 4
+    maxd = int(np.ceil(_DMAX * sr)) + 4
     if history is None:
         history = np.zeros(maxd, dtype=np.float64)
     ext = np.concatenate([history[-maxd:], mono])
@@ -125,7 +126,7 @@ class Spatializer:
         self.sr = sr
         self.cphase = 0.0
         self.mphase = 0.0
-        maxd = int(np.ceil((_D0 + 0.0012) * sr)) + 4
+        maxd = int(np.ceil(_DMAX * sr)) + 4
         self.history = np.zeros(maxd, dtype=np.float64)
 
     def process(self, frames, *, f_carrier, f_mod, path_fn, extent,
