@@ -75,6 +75,8 @@ def _draw(stdscr, eng, psel, msg=""):
     x = 11
     for i, v in enumerate(voices):
         tok = f"{i+1}:{v['f_mod']:.0f}Hz {v['path'][:4]} {v['gain']:.2f}"
+        if v["pulse"] > 0:
+            tok += f" ♩{v['hit_rate']:.0f}"
         if v["muted"]:
             tok = "~" + tok
         tok = " " + tok + " "

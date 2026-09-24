@@ -31,6 +31,7 @@ from scipy.signal import lfilter, lfilter_zi
 
 from .spatial import Spatializer, itd_gain_for_depth, shadow_for_ild
 from .paths import PATH_NAMES, get_path
+from .pulse import strike_gain
 
 SR = 48_000
 BLOCK = 1024
@@ -56,6 +57,10 @@ VOICE_PARAMS = [
     {"key": "level_depth", "label": "level depth",   "min": 0.0,   "max": 1.0,    "step": 0.05, "unit": "",    "default": 0.35},
     {"key": "depth",       "label": "motion depth",  "min": 0.0,   "max": 170.0,  "step": 10.0, "unit": "deg", "default": 150.0},
     {"key": "ild",         "label": "level cue",     "min": 0.0,   "max": 12.0,   "step": 0.5,  "unit": "dB",  "default": 6.0},
+    {"key": "pulse",       "label": "pulse",         "min": 0.0,   "max": 1.0,    "step": 0.1,  "unit": "",    "default": 0.0},
+    {"key": "decay",       "label": "strike decay",  "min": 1.0,   "max": 40.0,   "step": 1.0,  "unit": "ms",  "default": 6.0},
+    {"key": "hits",        "label": "hits / cycle",  "min": 1.0,   "max": 8.0,    "step": 1.0,  "unit": "",    "default": 1.0},
+    {"key": "hit_at",      "label": "hit point",     "min": 0.0,   "max": 345.0,  "step": 15.0, "unit": "deg", "default": 0.0},
     {"key": "gain",        "label": "voice gain",    "min": 0.0,   "max": 1.0,    "step": 0.05, "unit": "",    "default": 0.8},
 ]
 _VSPEC = {p["key"]: p for p in VOICE_PARAMS}
@@ -127,6 +132,7 @@ class Voice:
     def summary(self):
         t = self.target
         return {"carrier": t["carrier"], "f_mod": t["f_mod"], "path": self.path_name,
+                "pulse": t["pulse"], "hit_rate": t["f_mod"] * round(t["hits"]),
                 "engine": self.engine_mode, "mode": self.mode, "gain": t["gain"],
                 "muted": self.muted}
 
@@ -174,7 +180,14 @@ class Voice:
         swing = phi_p * np.sin(mph)
         L = self.tone_amp * (1.0 + pan) * np.sin(cph + swing + bias / 2)
         R = self.tone_amp * (1.0 - pan) * np.sin(cph - swing - bias / 2)
+        g = self._strike(p)(mph)
+        if g is not None:
+            L, R = L * g, R * g
         return L, R
+
+    def _strike(self, p):
+        return lambda mph: strike_gain(mph, p["f_mod"], p["pulse"], p["decay"],
+                                       p["hits"], p["hit_at"])
 
     def _spatial(self, n, p):
         pf = get_path(self.path_name)
@@ -182,7 +195,8 @@ class Voice:
             n, f_carrier=p["carrier"], f_mod=p["f_mod"], path_fn=pf,
             extent=np.deg2rad(p["arc"]), orient=np.deg2rad(p["bias"]),
             shadow=shadow_for_ild(p["ild"], p["carrier"]),
-            itd_gain=itd_gain_for_depth(p["depth"], p["carrier"]), amp=self.tone_amp)
+            itd_gain=itd_gain_for_depth(p["depth"], p["carrier"]), amp=self.tone_amp,
+            envelope=self._strike(p))
 
 
 _LOG_KEYS = {"carrier", "f_mod"}          # glide these in log-frequency (octaves)

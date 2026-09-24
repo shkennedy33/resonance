@@ -11,6 +11,7 @@ A *voice spec* is a dict describing one independent SAM generator:
     depth    : spatial motion depth, deg of interaural phase swing at 90 deg
                (150 ~ classic engine; pitch-independent). Legacy: itd_gain
     ild      : spatial level cue, dB at 90 deg. Legacy: shadow
+    pulse, decay, hits, hit_at : percussive strike layer (see pulse.py)
     gain     : per-voice mix level (0..1)
 
 Example:
@@ -26,10 +27,16 @@ import numpy as np
 from .core import SR, mix, normalize, fade
 from .spatial import render_path, itd_gain_for_depth, shadow_for_ild
 from .generators import sam as classic_sam, pink_noise
+from .core import timeline
+from .pulse import strike_gain
 
 
 def _render_voice(spec, dur, sr):
     engine = spec.get("engine", "spatial")
+    f_mod = spec.get("f_mod", 40.0)
+    env = lambda mph: strike_gain(mph, f_mod, spec.get("pulse", 0.0),
+                                  spec.get("decay", 6.0), spec.get("hits", 1),
+                                  spec.get("hit_at", 0.0))
     if engine == "spatial":
         fc = spec.get("carrier", 300.0)
         itd_gain = spec["itd_gain"] if "itd_gain" in spec and "depth" not in spec \
@@ -44,13 +51,16 @@ def _render_voice(spec, dur, sr):
             extent=np.deg2rad(spec["arc"]) if "arc" in spec else None,
             orient=np.deg2rad(spec.get("bias", 0.0)),
             shadow=shadow, itd_gain=itd_gain,
-            amp=0.6, sr=sr, fade_ms=60.0)
+            amp=0.6, sr=sr, fade_ms=60.0, envelope=env)
     else:  # classic
         L, R = classic_sam(
             spec.get("carrier", 300.0), spec.get("f_mod", 40.0), dur,
             arc_deg=spec.get("arc", 75.0), mode=spec.get("mode", "phase"),
             level_depth=spec.get("level_depth", 0.35),
             bias_deg=spec.get("bias", 0.0), amp=0.6, sr=sr, fade_ms=60.0)
+        g = env(2 * np.pi * f_mod * timeline(dur, sr)[: len(L)])
+        if g is not None:
+            L, R = L * g, R * g
     g = spec.get("gain", 0.8)
     return L * g, R * g
 

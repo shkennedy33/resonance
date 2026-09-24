@@ -49,6 +49,28 @@ motion is heard as width/flutter, not travel. So at 40 Hz you won't *hear* a
 swing; the entrainment claim is that the brainstem follows anyway. Press `z`
 (slow-mo) to hear any path's actual shape at 0.5 Hz.
 
+**Percussive strikes** (`resonance/pulse.py`) — any voice can be *struck*
+(`pulse` 0 = smooth tone … 1 = fully struck; `strike decay`; `hits / cycle`;
+`hit point` = where along the path the strike lands). Why: pure SAM has a
+perfectly flat envelope in each ear — all its 40 Hz lives in the interaural
+(binaural) channel. The strongest known 40 Hz brain response, the auditory
+steady-state response, runs on the *envelope*, and sharp onsets drive it
+hardest; the 40 Hz GENUS studies used click trains. Strikes add that channel,
+phase-locked to the motion. `hits` decouples rhythm from motion: a 10 Hz orbit
+(slow enough to hear as travel) struck 4× per lap is a 40 Hz strike train
+walking the compass around your head.
+
+| preset | 40 Hz envelope depth, one ear |
+|---|---|
+| `classic-gamma` (patent SAM) | 0.000 |
+| `gamma-focus` (spatial, smooth) | 0.130 |
+| `gamma-strike` (motion + strikes) | 0.333 |
+| `gamma-walk` (10 Hz orbit × 4 hits) | 0.405 |
+| `gamma-click` (strikes only, GENUS-style control) | 0.600 |
+
+Science caveat: the mouse results (Martorell 2019, Murdock 2024) are contested
+(Soula 2023 failed to replicate), and human trials are early.
+
 **Presets** (`presets/*.json`) — the whole rack saved as a small, hand-editable
 JSON file. `w` saves from the TUI, `o` glides to one over 3 s.
 
@@ -108,6 +130,7 @@ Every claim about the signal is measured:
 ```bash
 python test_engine.py       # realtime: clickless, IPD ±150° @ 40 Hz, knob glides
 python test_session.py      # sessions: timing, no clicks at scene changes, clean fades
+python test_pulse.py        # strikes: envelope drive, hit decoupling, clickless sweeps
 python verify.py            # patent SAM: predicted vs measured IPD -> out/sam_gamma40.png
 python verify_spatial.py    # head model: ITD 656 µs @ 90°, orbit continuity
 python verify_multivoice.py # voices coexist and separate in space

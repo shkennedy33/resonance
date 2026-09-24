@@ -259,3 +259,39 @@ never consciously audible as travel; SAM's claim is subcortical following
 Measurement gotcha: hilbert-IPD is unreliable when f_mod is near the carrier
 (e.g. 60 Hz carrier / 40 Hz mod reads asymmetric) — method limit, not audio.
 All tests green.
+
+## 2026-09-23 — Session 5d: percussive strike layer (S's gamma hypothesis)
+
+**S's hypothesis:** what makes 40 Hz work is a *percussive* signal (per the
+GENUS 40 Hz studies). **Mechanism that backs it:** classic SAM has a FLAT
+per-ear envelope — measured 40 Hz envelope depth 0.000 — so all its f_mod
+energy is interaural only. ASSR (peaks ~40 Hz) is envelope-driven, strongest
+for sharp onsets; Martorell 2019 used 1 ms click trains. Told S the evidence
+honestly: Tsai lab mouse results (Martorell 2019, Murdock 2024 glymphatic) vs
+Soula 2023 (Buzsaki) non-replication; human trials early. He referenced
+"recent wild studies" — may be post my cutoff; asked him to share.
+
+**Built:** `resonance/pulse.py` `strike_gain(mph, f_mod, pulse, decay_ms, hits,
+hit_at)`: 1 ms raised-cos attack from previous residual (continuous even when
+decay > period) + exp decay; RMS loudness makeup capped 1.8x. Phase-locked to
+the voice's MOD phase, so strikes land at a spatial position (`hit_at` deg).
+`hits` = strikes per path cycle -> decouples rhythm from motion (the key idea:
+motion <=10 Hz is audible as travel; hits*f_mod = 40 Hz). New voice params:
+pulse, decay, hits, hit_at. Wired into Voice (classic: multiply L/R; spatial:
+`envelope=` hook on Spatializer.process/render_path, applied to mono pre-HRTF)
+and compose.py (offline). TUI rack shows ♩<hit rate>.
+
+**Presets (experimental trio for EEG later):** gamma-focus/classic-gamma =
+motion only; gamma-click = strike only (arc/depth/ild 0, 1 kHz, 2 ms);
+gamma-strike = both; plus gamma-walk (10 Hz orbit x4). Envelope depth @40 Hz
+one ear: classic 0.000, focus 0.130 (ILD leak), strike 0.333, walk 0.405,
+click 0.600.
+
+**Tests:** new `test_pulse.py` ALL PASS (flat classic env, strong struck env,
+walk peak 39.8 Hz, wrap continuity, live pulse/decay sweep 1.22x steady).
+Everything else still green.
+
+**Ideas parked:** theta-gamma NESTING (accent pattern so strikes group by theta
+cycle — real hippocampal phenomenon); broadband/noise-burst strike timbre
+(closer to GENUS clicks); per-hit spatial ping-pong patterns; visual 40 Hz
+flicker channel (GENUS's strongest results were audio+visual combined).
